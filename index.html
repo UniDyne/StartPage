@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Start Page</title>
+<meta name="theme-color" content="#0a0a0a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="bg-layer"></div>
+<div id="bg-scrim"></div>
+
+<h1 id="page-title" class="page-title hidden"></h1>
+
+<div id="toolbar">
+  <button id="btn-add-widget" class="toolbar-icon-btn" title="Add widget" aria-label="Add widget">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+  <button id="btn-settings" class="toolbar-icon-btn" title="Page settings" aria-label="Page settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+</div>
+
+<main id="board" class="board">
+  <div class="column" data-col="0"></div>
+  <div class="column" data-col="1"></div>
+  <div class="column" data-col="2"></div>
+  <div class="column" data-col="3"></div>
+</main>
+
+<!-- Add / Edit widget modal -->
+<div id="modal-widget" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="widget-modal-title">Add widget</h2>
+      <button class="icon-btn modal-close" data-close="modal-widget">✕</button>
+    </div>
+    <div class="modal-body" id="widget-modal-body">
+      <label class="field">
+        <span>Widget name (shown in title bar, optional)</span>
+        <input type="text" id="widget-name-input" placeholder="Uses widget type if blank">
+      </label>
+      <label class="field">
+        <span>Widget type</span>
+        <select id="widget-type-select">
+          <option value="datetime">Date &amp; Time</option>
+          <option value="ipinfo">IP &amp; User Agent</option>
+          <option value="links">Link List</option>
+          <option value="markdown">Markdown</option>
+          <option value="feed">RSS / Atom Feed</option>
+        </select>
+      </label>
+      <div id="widget-type-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="widget-modal-cancel" class="chrome-btn">Cancel</button>
+      <button id="widget-modal-save" class="chrome-btn primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Page settings modal -->
+<div id="modal-settings" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Page settings</h2>
+      <button class="icon-btn modal-close" data-close="modal-settings">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span>Page name (shown as a heading in the corner)</span>
+        <input type="text" id="setting-page-name" placeholder="Leave blank to hide the heading">
+      </label>
+
+      <hr>
+
+      <label class="field">
+        <span>Background image URL</span>
+        <input type="url" id="setting-bg-url" placeholder="https://…/photo.jpg">
+      </label>
+      <label class="field">
+        <span>…or upload an image (stored locally)</span>
+        <input type="file" id="setting-bg-file" accept="image/*">
+      </label>
+      <button id="setting-bg-clear" class="chrome-btn small">Clear background</button>
+
+      <hr>
+
+      <label class="field">
+        <span>Widget tint color</span>
+        <input type="color" id="setting-tint-color" value="#101010">
+      </label>
+      <label class="field">
+        <span>Tint opacity: <output id="tint-opacity-out">0.35</output></span>
+        <input type="range" id="setting-tint-opacity" min="0" max="1" step="0.05" value="0.35">
+      </label>
+      <label class="field">
+        <span>Blur amount: <output id="tint-blur-out">14</output>px</span>
+        <input type="range" id="setting-tint-blur" min="0" max="40" step="1" value="14">
+      </label>
+      <label class="field">
+        <span>Text color</span>
+        <select id="setting-text-color">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+
+      <hr>
+      <button id="setting-export" class="chrome-btn small">Export config</button>
+      <button id="setting-import" class="chrome-btn small">Import config</button>
+      <button id="setting-reset" class="chrome-btn small danger">Reset all</button>
+    </div>
+    <div class="modal-footer">
+      <button id="settings-modal-close" class="chrome-btn primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="import-file-input" accept="application/json" class="hidden">
+
+<div id="toast" class="toast hidden"></div>
+
+<div id="page-bar-left" class="page-bar-left">
+  <div id="page-tiles" class="page-tiles"></div>
+  <button id="btn-add-page" class="page-btn" title="Add page">+</button>
+  <button id="btn-delete-page" class="page-btn page-btn-delete" title="Delete this page">−</button>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
