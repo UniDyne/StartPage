@@ -219,47 +219,106 @@ function uid(){
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-// Minimal markdown subset: headings, bold, italic, inline code, links, lists, paragraphs.
+// Markdown subset: headings (h1-h6), fenced code blocks, images, links, bold,
+// italic, strikethrough, inline code, ordered/unordered lists, blockquotes,
+// horizontal rules, paragraphs. Not a full CommonMark implementation (no
+// nested blocks, tables, or indented code) but covers what readability-extracted
+// articles and hand-written notes typically use.
 function renderMarkdown(src){
   if(!src) return "";
   const escaped = escapeHtml(src);
   const lines = escaped.split(/\r?\n/);
   const htmlLines = [];
-  let inList = false;
+  let blockState = null; // null | "ul" | "ol" | "blockquote"
+  let inFence = false;
 
-  for(const rawLine of lines){
-    const line = rawLine;
-    const headingMatch = /^(#{1,3})\s+(.*)$/.exec(line);
-    const listMatch = /^[-*]\s+(.*)$/.exec(line);
+  function closeBlock(){
+    if(blockState === "ul") htmlLines.push("</ul>");
+    else if(blockState === "ol") htmlLines.push("</ol>");
+    else if(blockState === "blockquote") htmlLines.push("</blockquote>");
+    blockState = null;
+  }
+
+  for(const line of lines){
+    const fenceMatch = /^```\s*([\w-]*)\s*$/.exec(line);
+    if(fenceMatch){
+      if(inFence){
+        htmlLines.push("</code></pre>");
+        inFence = false;
+      }else{
+        closeBlock();
+        const lang = fenceMatch[1];
+        htmlLines.push(`<pre><code${lang ? ` class="language-${lang}"` : ""}>`);
+        inFence = true;
+      }
+      continue;
+    }
+    if(inFence){
+      htmlLines.push(line);
+      continue;
+    }
+
+    const headingMatch = /^(#{1,6})\s+(.*)$/.exec(line);
+    const hrMatch = /^(?:-{3,}|\*{3,}|_{3,})$/.exec(line.trim());
+    const quoteMatch = /^&gt;\s?(.*)$/.exec(line);
+    const olMatch = /^\d+\.\s+(.*)$/.exec(line);
+    const ulMatch = /^[-*]\s+(.*)$/.exec(line);
 
     if(headingMatch){
-      if(inList){ htmlLines.push("</ul>"); inList = false; }
+      closeBlock();
       const level = headingMatch[1].length;
       htmlLines.push(`<h${level}>${inline(headingMatch[2])}</h${level}>`);
       continue;
     }
-    if(listMatch){
-      if(!inList){ htmlLines.push("<ul>"); inList = true; }
-      htmlLines.push(`<li>${inline(listMatch[1])}</li>`);
+    if(hrMatch){
+      closeBlock();
+      htmlLines.push("<hr>");
       continue;
     }
-    if(inList){ htmlLines.push("</ul>"); inList = false; }
+    if(quoteMatch){
+      if(blockState !== "blockquote"){ closeBlock(); htmlLines.push("<blockquote>"); blockState = "blockquote"; }
+      htmlLines.push(`<p>${inline(quoteMatch[1])}</p>`);
+      continue;
+    }
+    if(olMatch){
+      if(blockState !== "ol"){ closeBlock(); htmlLines.push("<ol>"); blockState = "ol"; }
+      htmlLines.push(`<li>${inline(olMatch[1])}</li>`);
+      continue;
+    }
+    if(ulMatch){
+      if(blockState !== "ul"){ closeBlock(); htmlLines.push("<ul>"); blockState = "ul"; }
+      htmlLines.push(`<li>${inline(ulMatch[1])}</li>`);
+      continue;
+    }
 
+    closeBlock();
     if(line.trim() === ""){
       continue;
     }
     htmlLines.push(`<p>${inline(line)}</p>`);
   }
-  if(inList) htmlLines.push("</ul>");
+
+  if(inFence) htmlLines.push("</code></pre>");
+  closeBlock();
+
   return htmlLines.join("\n");
 }
+
+// Only http(s) and protocol-relative URLs are linkified/embedded — this content
+// can originate from arbitrary fetched web pages, so schemes like javascript:
+// are deliberately excluded rather than passed through into href/src.
+const SAFE_URL = "(?:https?:\\/\\/[^\\s)]+|\\/\\/[^\\s)]+)";
+const IMAGE_RE = new RegExp(`!\\[([^\\]]*)\\]\\((${SAFE_URL})\\)`, "g");
+const LINK_RE = new RegExp(`\\[([^\\]]+)\\]\\((${SAFE_URL})\\)`, "g");
 
 function inline(text){
   return text
     .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(IMAGE_RE, '<img src="$2" alt="$1" loading="lazy">')
+    .replace(LINK_RE, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>");
 }
 
 function escapeHtml(str){
