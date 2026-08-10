@@ -82,6 +82,10 @@
         <span>Page name (shown as a heading in the corner)</span>
         <input type="text" id="setting-page-name" placeholder="Leave blank to hide the heading">
       </label>
+      <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="setting-page-hidden" style="width:auto;">
+        <span>Hide this page's tile (shift+click the + button to reveal hidden pages)</span>
+      </label>
 
       <hr>
 
@@ -134,7 +138,7 @@
 
 <div id="page-bar-left" class="page-bar-left">
   <div id="page-tiles" class="page-tiles"></div>
-  <button id="btn-add-page" class="page-btn" title="Add page">+</button>
+  <button id="btn-add-page" class="page-btn" title="Add page (shift+click to reveal hidden pages)">+</button>
   <button id="btn-delete-page" class="page-btn page-btn-delete" title="Delete this page">−</button>
 </div>
 

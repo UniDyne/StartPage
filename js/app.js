@@ -46,11 +46,15 @@ const pageTilesEl = document.getElementById("page-tiles");
 const btnAddPage = document.getElementById("btn-add-page");
 const btnDeletePage = document.getElementById("btn-delete-page");
 
+let showHiddenPages = false;
+
 function renderPageSwitcher(){
-  pageTilesEl.innerHTML = config.pages.map(p => `
-    <button class="page-tile ${p.id === activePage.id ? "active" : ""}"
+  const visiblePages = config.pages.filter(p => !p.hidden || p.id === activePage.id || showHiddenPages);
+
+  pageTilesEl.innerHTML = visiblePages.map(p => `
+    <button class="page-tile ${p.id === activePage.id ? "active" : ""} ${p.hidden ? "revealed-hidden" : ""}"
       data-page-id="${p.id}"
-      title="${escapeAttr(p.name)}"
+      title="${escapeAttr(p.name)}${p.hidden ? " (hidden)" : ""}"
       style="background-color: rgb(${p.theme.tintColor});"></button>
   `).join("");
 
@@ -70,7 +74,12 @@ function switchPage(pageId){
   renderAll();
 }
 
-btnAddPage.addEventListener("click", () => {
+btnAddPage.addEventListener("click", e => {
+  if(e.shiftKey){
+    showHiddenPages = !showHiddenPages;
+    renderPageSwitcher();
+    return;
+  }
   const page = createPage({ name: `Page ${config.pages.length + 1}` });
   config.pages.push(page);
   config.activePageId = page.id;
@@ -190,6 +199,7 @@ document.getElementById("btn-add-widget").addEventListener("click", () => {
 
 const modalSettings = document.getElementById("modal-settings");
 const pageNameInput = document.getElementById("setting-page-name");
+const pageHiddenInput = document.getElementById("setting-page-hidden");
 const bgUrlInput = document.getElementById("setting-bg-url");
 const bgFileInput = document.getElementById("setting-bg-file");
 const bgClearBtn = document.getElementById("setting-bg-clear");
@@ -214,6 +224,7 @@ function hexToRgb(hex){
 
 function openSettingsModal(){
   pageNameInput.value = activePage.name || "";
+  pageHiddenInput.checked = !!activePage.hidden;
   bgUrlInput.value = activePage.background.value && !activePage.background.value.startsWith("data:") ? activePage.background.value : "";
   tintColorInput.value = rgbToHex(activePage.theme.tintColor);
   tintOpacityInput.value = activePage.theme.tintOpacity;
@@ -231,6 +242,12 @@ pageNameInput.addEventListener("change", () => {
   activePage.name = pageNameInput.value.trim();
   saveConfig(config);
   applyTheme();
+  renderPageSwitcher();
+});
+
+pageHiddenInput.addEventListener("change", () => {
+  activePage.hidden = pageHiddenInput.checked;
+  saveConfig(config);
   renderPageSwitcher();
 });
 

@@ -25,13 +25,14 @@ function firstPageWidgets(){
   ];
 }
 
-export function createPage({ name, widgets, background, theme } = {}){
+export function createPage({ name, widgets, background, theme, hidden } = {}){
   return {
     id: uid(),
     name: name || "Page",
     background: background || { value: "" },
     theme: theme || defaultTheme(),
-    widgets: widgets || []
+    widgets: widgets || [],
+    hidden: hidden || false
   };
 }
 
