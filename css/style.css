@@ -383,6 +383,7 @@ html,body{
 .md-body a{ color:#8ab4ff; }
 .md-body ul{ margin:0.3em 0; padding-left: 1.2em; }
 .md-body code{ background: rgba(255,255,255,0.1); padding:0.0625rem 0.25rem; border-radius:0.25rem; font-size:0.75rem; }
+.md-body img { max-width: 100%; }
 .modal-lightbox .md-body{ font-size:0.875rem; line-height:1.65; }
 
 /* ---------- To-do widget ---------- */
