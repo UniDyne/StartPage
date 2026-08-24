@@ -1,3 +1,5 @@
+import { escapeHtml, renderInline } from "../inline-markdown.js";
+
 export const meta = { type: "todo", label: "To-do List" };
 
 export function defaultSettings(){
@@ -57,7 +59,7 @@ export function mount(el, widget, ctx){
     listEl.innerHTML = s.items.map(item => `
       <li class="todo-item ${item.done ? "done" : ""}" data-id="${item.id}">
         <input type="checkbox" ${item.done ? "checked" : ""}>
-        <span class="todo-text">${escapeHtml(item.text)}</span>
+        <span class="todo-text" title="Double-click to edit">${renderInline(item.text)}</span>
         <button type="button" class="icon-btn todo-remove" title="Remove">✕</button>
       </li>
     `).join("");
@@ -73,7 +75,43 @@ export function mount(el, widget, ctx){
         renderItems();
         persist();
       });
+      row.querySelector(".todo-text").addEventListener("dblclick", () => {
+        const item = s.items.find(i => i.id === id);
+        if(item) startEditItem(row, item);
+      });
     });
+  }
+
+  function startEditItem(row, item){
+    const span = row.querySelector(".todo-text");
+    const editInput = document.createElement("input");
+    editInput.type = "text";
+    editInput.className = "todo-edit-input";
+    editInput.value = item.text;
+    span.replaceWith(editInput);
+    editInput.focus();
+    editInput.select();
+
+    let settled = false;
+    function commit(){
+      if(settled) return;
+      settled = true;
+      const text = editInput.value.trim();
+      if(text) item.text = text;
+      renderItems();
+      persist();
+    }
+    function cancel(){
+      if(settled) return;
+      settled = true;
+      renderItems();
+    }
+
+    editInput.addEventListener("keydown", e => {
+      if(e.key === "Enter"){ e.preventDefault(); commit(); }
+      else if(e.key === "Escape"){ e.preventDefault(); cancel(); }
+    });
+    editInput.addEventListener("blur", commit);
   }
 
   form.addEventListener("submit", e => {
@@ -95,11 +133,6 @@ function uid(){
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-function escapeHtml(str){
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
 function escapeAttr(str){
   return String(str || "")
     .replace(/&/g, "&amp;")

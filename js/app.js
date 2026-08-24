@@ -93,15 +93,50 @@ function renderPageSwitcher(){
   pageTilesEl.innerHTML = visiblePages.map(p => `
     <button class="page-tile ${p.id === activePage.id ? "active" : ""} ${p.hidden ? "revealed-hidden" : ""}"
       data-page-id="${p.id}"
-      title="${escapeAttr(p.name)}${p.hidden ? " (hidden)" : ""}"
+      title="${escapeAttr(p.name)}${p.hidden ? " (hidden)" : ""} — drop a widget here to copy it"
       style="background-color: rgb(${p.theme.tintColor});"></button>
   `).join("");
 
   pageTilesEl.querySelectorAll(".page-tile").forEach(btn => {
     btn.addEventListener("click", () => switchPage(btn.dataset.pageId));
+    btn.addEventListener("dragover", e => {
+      if(!e.dataTransfer.types.includes("application/x-startpage-widget")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      btn.classList.add("drag-over-page");
+    });
+    btn.addEventListener("dragleave", () => {
+      btn.classList.remove("drag-over-page");
+    });
+    btn.addEventListener("drop", e => {
+      if(!e.dataTransfer.types.includes("application/x-startpage-widget")) return;
+      e.preventDefault();
+      btn.classList.remove("drag-over-page");
+      const widgetId = e.dataTransfer.getData("application/x-startpage-widget");
+      if(widgetId) copyWidgetToPage(widgetId, btn.dataset.pageId);
+    });
   });
 
   btnDeletePage.disabled = config.pages.length <= 1;
+}
+
+function copyWidgetToPage(widgetId, targetPageId){
+  const widget = activePage.widgets.find(w => w.id === widgetId);
+  const targetPage = config.pages.find(p => p.id === targetPageId);
+  if(!widget || !targetPage) return;
+
+  const maxOrderInCol0 = Math.max(-1, ...targetPage.widgets.filter(w => w.col === 0).map(w => w.order));
+  targetPage.widgets.push({
+    id: uid(),
+    type: widget.type,
+    name: widget.name,
+    col: 0,
+    order: maxOrderInCol0 + 1,
+    settings: JSON.parse(JSON.stringify(widget.settings))
+  });
+  saveConfig(config);
+  showToast(`Widget copied to "${targetPage.name || "page"}"`);
+  if(targetPageId === activePage.id) renderAll();
 }
 
 function switchPage(pageId){

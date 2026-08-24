@@ -1,3 +1,5 @@
+import { escapeHtml, inlineMarkdown as inline } from "../inline-markdown.js";
+
 export const meta = { type: "markdown", label: "Markdown" };
 
 const READABILITY_PROXY_URL = "https://readability-markdown-proxy.unidyne.workers.dev/";
@@ -304,28 +306,6 @@ function renderMarkdown(src){
   return htmlLines.join("\n");
 }
 
-// Only http(s) and protocol-relative URLs are linkified/embedded — this content
-// can originate from arbitrary fetched web pages, so schemes like javascript:
-// are deliberately excluded rather than passed through into href/src.
-const SAFE_URL = "(?:https?:\\/\\/[^\\s)]+|\\/\\/[^\\s)]+)";
-const IMAGE_RE = new RegExp(`!\\[([^\\]]*)\\]\\((${SAFE_URL})\\)`, "g");
-const LINK_RE = new RegExp(`\\[([^\\]]+)\\]\\((${SAFE_URL})\\)`, "g");
-
-function inline(text){
-  return text
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(IMAGE_RE, '<img src="$2" alt="$1" loading="lazy">')
-    .replace(LINK_RE, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/~~([^~]+)~~/g, "<del>$1</del>");
-}
-
-function escapeHtml(str){
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
 function escapeAttr(str){
   return String(str || "")
     .replace(/&/g, "&amp;")

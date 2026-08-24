@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./js/storage.js",
   "./js/registry.js",
   "./js/render.js",
+  "./js/inline-markdown.js",
   "./js/widgets/datetime.js",
   "./js/widgets/ipinfo.js",
   "./js/widgets/links.js",

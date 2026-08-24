@@ -50,8 +50,9 @@ function buildWidgetNode(widget, handlers){
   head.addEventListener("dragstart", e => {
     dragState = { id: widget.id };
     wrapper.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = "copyMove";
     e.dataTransfer.setData("text/plain", widget.id);
+    e.dataTransfer.setData("application/x-startpage-widget", widget.id);
   });
   head.addEventListener("dragend", () => {
     wrapper.classList.remove("dragging");
