@@ -53,11 +53,13 @@ function buildWidgetNode(widget, handlers){
     e.dataTransfer.effectAllowed = "copyMove";
     e.dataTransfer.setData("text/plain", widget.id);
     e.dataTransfer.setData("application/x-startpage-widget", widget.id);
+    if(handlers.onWidgetDragStart) handlers.onWidgetDragStart();
   });
   head.addEventListener("dragend", () => {
     wrapper.classList.remove("dragging");
     dragState = null;
     clearDragOverStyling();
+    if(handlers.onWidgetDragEnd) handlers.onWidgetDragEnd();
   });
 
   head.querySelector('[data-action="edit"]').addEventListener("click", () => handlers.onEdit(widget.id));

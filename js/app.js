@@ -63,8 +63,17 @@ searchBarForm.addEventListener("submit", e => {
 });
 
 function renderAll(){
-  renderBoard(activePage, board, { onEdit, onDelete, onReorder, onSettingsChange });
+  renderBoard(activePage, board, { onEdit, onDelete, onReorder, onSettingsChange, onWidgetDragStart, onWidgetDragEnd });
   renderPageSwitcher();
+}
+
+const pageBarLeft = document.getElementById("page-bar-left");
+
+function onWidgetDragStart(){
+  pageBarLeft.classList.add("drag-active");
+}
+function onWidgetDragEnd(){
+  pageBarLeft.classList.remove("drag-active");
 }
 
 function persistAndRender(){
@@ -86,6 +95,7 @@ const btnAddPage = document.getElementById("btn-add-page");
 const btnDeletePage = document.getElementById("btn-delete-page");
 
 let showHiddenPages = false;
+let draggedPageId = null;
 
 function renderPageSwitcher(){
   const visiblePages = config.pages.filter(p => !p.hidden || p.id === activePage.id || showHiddenPages);
@@ -93,31 +103,66 @@ function renderPageSwitcher(){
   pageTilesEl.innerHTML = visiblePages.map(p => `
     <button class="page-tile ${p.id === activePage.id ? "active" : ""} ${p.hidden ? "revealed-hidden" : ""}"
       data-page-id="${p.id}"
-      title="${escapeAttr(p.name)}${p.hidden ? " (hidden)" : ""} — drop a widget here to copy it"
+      draggable="true"
+      title="${escapeAttr(p.name)}${p.hidden ? " (hidden)" : ""} — drag to reorder, or drop a widget here to copy it"
       style="background-color: rgb(${p.theme.tintColor});"></button>
   `).join("");
 
   pageTilesEl.querySelectorAll(".page-tile").forEach(btn => {
     btn.addEventListener("click", () => switchPage(btn.dataset.pageId));
+
+    btn.addEventListener("dragstart", e => {
+      draggedPageId = btn.dataset.pageId;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("application/x-startpage-page", btn.dataset.pageId);
+      btn.classList.add("dragging");
+    });
+    btn.addEventListener("dragend", () => {
+      draggedPageId = null;
+      btn.classList.remove("dragging");
+      pageTilesEl.querySelectorAll(".page-tile").forEach(el => el.classList.remove("drag-over-page", "drag-over-reorder"));
+    });
+
     btn.addEventListener("dragover", e => {
-      if(!e.dataTransfer.types.includes("application/x-startpage-widget")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-      btn.classList.add("drag-over-page");
+      if(e.dataTransfer.types.includes("application/x-startpage-widget")){
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        btn.classList.add("drag-over-page");
+      }else if(e.dataTransfer.types.includes("application/x-startpage-page") && btn.dataset.pageId !== draggedPageId){
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        btn.classList.add("drag-over-reorder");
+      }
     });
     btn.addEventListener("dragleave", () => {
-      btn.classList.remove("drag-over-page");
+      btn.classList.remove("drag-over-page", "drag-over-reorder");
     });
     btn.addEventListener("drop", e => {
-      if(!e.dataTransfer.types.includes("application/x-startpage-widget")) return;
-      e.preventDefault();
-      btn.classList.remove("drag-over-page");
-      const widgetId = e.dataTransfer.getData("application/x-startpage-widget");
-      if(widgetId) copyWidgetToPage(widgetId, btn.dataset.pageId);
+      if(e.dataTransfer.types.includes("application/x-startpage-widget")){
+        e.preventDefault();
+        btn.classList.remove("drag-over-page");
+        const widgetId = e.dataTransfer.getData("application/x-startpage-widget");
+        if(widgetId) copyWidgetToPage(widgetId, btn.dataset.pageId);
+      }else if(e.dataTransfer.types.includes("application/x-startpage-page")){
+        e.preventDefault();
+        btn.classList.remove("drag-over-reorder");
+        const sourcePageId = e.dataTransfer.getData("application/x-startpage-page");
+        if(sourcePageId && sourcePageId !== btn.dataset.pageId) reorderPages(sourcePageId, btn.dataset.pageId);
+      }
     });
   });
 
   btnDeletePage.disabled = config.pages.length <= 1;
+}
+
+function reorderPages(sourcePageId, targetPageId){
+  const fromIdx = config.pages.findIndex(p => p.id === sourcePageId);
+  const toIdx = config.pages.findIndex(p => p.id === targetPageId);
+  if(fromIdx === -1 || toIdx === -1) return;
+  const [moved] = config.pages.splice(fromIdx, 1);
+  config.pages.splice(toIdx, 0, moved);
+  saveConfig(config);
+  renderPageSwitcher();
 }
 
 function copyWidgetToPage(widgetId, targetPageId){

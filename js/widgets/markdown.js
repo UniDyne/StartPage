@@ -1,6 +1,9 @@
 import { escapeHtml, inlineMarkdown as inline } from "../inline-markdown.js";
+import { createDragCoordinator } from "../drag-reorder.js";
 
 export const meta = { type: "markdown", label: "Markdown" };
+
+const dragCoordinator = createDragCoordinator("md-item-row");
 
 const READABILITY_PROXY_URL = "https://readability-markdown-proxy.unidyne.workers.dev/";
 
@@ -42,6 +45,7 @@ export function mount(el, widget, ctx){
 
   const listEl = document.createElement("ul");
   listEl.className = "md-item-list";
+  listEl.dataset.widgetId = widget.id;
   el.appendChild(listEl);
 
   let overlay = null;
@@ -74,6 +78,11 @@ export function mount(el, widget, ctx){
     ctx.onSettingsChange({ items: s.items });
   }
 
+  function ensureEmptyState(){
+    if(s.items.length || listEl.querySelector(".md-item-row") || listEl.querySelector(".md-item-empty")) return;
+    renderList();
+  }
+
   function renderList(){
     if(!s.items.length){
       listEl.innerHTML = `<li class="md-item-empty">No articles yet — use the + above to add one.</li>`;
@@ -97,8 +106,25 @@ export function mount(el, widget, ctx){
         renderList();
         persist();
       });
+      dragCoordinator.makeItemDraggable(row, widget.id, id, ".md-item-list");
     });
   }
+
+  dragCoordinator.wireContainer(listEl, ".md-item-list", "md-item-empty");
+  dragCoordinator.register(widget.id, {
+    getItem(id){ return s.items.find(i => i.id === id); },
+    removeItem(id){
+      s.items = s.items.filter(i => i.id !== id);
+      persist();
+      ensureEmptyState();
+    },
+    reconcileOrder(ids, extraItem){
+      const byId = new Map(s.items.map(i => [i.id, i]));
+      if(extraItem) byId.set(extraItem.id, extraItem);
+      s.items = ids.map(id => byId.get(id)).filter(Boolean);
+      persist();
+    }
+  });
 
   function openReadOverlay(item){
     showOverlay(`
@@ -207,7 +233,7 @@ export function mount(el, widget, ctx){
 
   renderList();
 
-  return { destroy(){ closeOverlay(); } };
+  return { destroy(){ closeOverlay(); dragCoordinator.unregister(widget.id); } };
 }
 
 function deriveItemTitle(item){

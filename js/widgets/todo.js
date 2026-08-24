@@ -1,6 +1,9 @@
 import { escapeHtml, renderInline } from "../inline-markdown.js";
+import { createDragCoordinator } from "../drag-reorder.js";
 
 export const meta = { type: "todo", label: "To-do List" };
+
+const dragCoordinator = createDragCoordinator("todo-item");
 
 export function defaultSettings(){
   return { title: "", items: [] };
@@ -44,11 +47,17 @@ export function mount(el, widget, ctx){
   `;
 
   const listEl = el.querySelector(".todo-list");
+  listEl.dataset.widgetId = widget.id;
   const form = el.querySelector(".todo-add-row");
   const input = el.querySelector(".todo-add-input");
 
   function persist(){
     ctx.onSettingsChange({ title: s.title, items: s.items });
+  }
+
+  function ensureEmptyState(){
+    if(s.items.length || listEl.querySelector(".todo-item") || listEl.querySelector(".todo-empty")) return;
+    renderItems();
   }
 
   function renderItems(){
@@ -79,8 +88,25 @@ export function mount(el, widget, ctx){
         const item = s.items.find(i => i.id === id);
         if(item) startEditItem(row, item);
       });
+      dragCoordinator.makeItemDraggable(row, widget.id, id, ".todo-list");
     });
   }
+
+  dragCoordinator.wireContainer(listEl, ".todo-list", "todo-empty");
+  dragCoordinator.register(widget.id, {
+    getItem(id){ return s.items.find(i => i.id === id); },
+    removeItem(id){
+      s.items = s.items.filter(i => i.id !== id);
+      persist();
+      ensureEmptyState();
+    },
+    reconcileOrder(ids, extraItem){
+      const byId = new Map(s.items.map(i => [i.id, i]));
+      if(extraItem) byId.set(extraItem.id, extraItem);
+      s.items = ids.map(id => byId.get(id)).filter(Boolean);
+      persist();
+    }
+  });
 
   function startEditItem(row, item){
     const span = row.querySelector(".todo-text");
@@ -126,7 +152,7 @@ export function mount(el, widget, ctx){
 
   renderItems();
 
-  return { destroy(){} };
+  return { destroy(){ dragCoordinator.unregister(widget.id); } };
 }
 
 function uid(){

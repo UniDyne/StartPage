@@ -130,6 +130,7 @@ html,body{
   transition: opacity 0.2s ease;
 }
 .page-bar-left:hover{ opacity: 1; }
+.page-bar-left.drag-active{ opacity: 1; }
 
 .page-tiles{
   display:flex;
@@ -157,6 +158,13 @@ html,body{
   transform: translateY(-2px) scale(1.15);
   border-color: rgba(255,255,255,0.8);
   box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+}
+.page-tile.dragging{ opacity: 0.35; }
+.page-tile.drag-over-reorder{
+  opacity: 1;
+  transform: translateY(-2px) scale(1.1);
+  border-color: rgba(138,180,255,0.9);
+  box-shadow: 0 0 0 2px rgba(138,180,255,0.35);
 }
 
 .page-btn{
@@ -412,6 +420,12 @@ html,body{
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .md-item-row:last-child{ border-bottom:none; }
+.md-item-row.dragging{ opacity:0.35; }
+.md-item-list.drag-over{
+  outline: 2px dashed rgba(255,255,255,0.35);
+  outline-offset: 0.25rem;
+  border-radius: 0.5rem;
+}
 .md-item-open{
   flex:1;
   display:flex;
@@ -506,6 +520,12 @@ html,body{
   font-size: 0.8125rem;
 }
 .todo-item:last-child{ border-bottom:none; }
+.todo-item.dragging{ opacity:0.35; }
+.todo-list.drag-over{
+  outline: 2px dashed rgba(255,255,255,0.35);
+  outline-offset: 0.25rem;
+  border-radius: 0.5rem;
+}
 .todo-item input[type="checkbox"]{ flex-shrink:0; accent-color: #8ab4ff; }
 .todo-item .todo-text{ flex:1; overflow-wrap:anywhere; cursor: text; }
 .todo-item .todo-text code{ background: rgba(255,255,255,0.12); border-radius:0.25rem; padding:0.0625rem 0.25rem; }
