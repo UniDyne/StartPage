@@ -1,6 +1,7 @@
-import { loadConfig, saveConfig, uid, createPage, getActivePage, normalizeConfig } from "./storage.js";
+import { loadConfig, saveConfig, uid, createPage, getActivePage, normalizeConfig, preparePageForExport, pageFromImport, defaultSearchBar } from "./storage.js";
 import { registry, widgetTypes } from "./registry.js";
 import { renderBoard } from "./render.js";
+import { buildSearchUrl, faviconUrlFor } from "./searchbar.js";
 
 let config = loadConfig();
 let activePage = getActivePage(config);
@@ -21,7 +22,45 @@ function applyTheme(){
   const name = (activePage.name || "").trim();
   pageTitleEl.textContent = name;
   pageTitleEl.classList.toggle("hidden", !name);
+
+  updateSearchBar();
 }
+
+// ---------------- Search bar ----------------
+
+const searchBarEl = document.getElementById("search-bar");
+const searchBarForm = document.getElementById("search-bar-form");
+const searchBarInput = document.getElementById("search-bar-input");
+const searchBarFavicon = document.getElementById("search-bar-favicon");
+
+function updateSearchBar(){
+  const search = { ...defaultSearchBar(), ...activePage.search };
+  searchBarEl.classList.toggle("hidden", !search.enabled);
+  if(!search.enabled) return;
+
+  const favicon = faviconUrlFor(search);
+  searchBarFavicon.src = favicon || "";
+  searchBarFavicon.classList.toggle("hidden", !favicon);
+}
+
+function focusSearchBar(){
+  const search = { ...defaultSearchBar(), ...activePage.search };
+  if(search.enabled) searchBarInput.focus();
+}
+
+searchBarForm.addEventListener("submit", e => {
+  e.preventDefault();
+  const query = searchBarInput.value.trim();
+  if(!query) return;
+  const search = { ...defaultSearchBar(), ...activePage.search };
+  const url = buildSearchUrl(search, query);
+  if(!url) return;
+  if(search.openInNewTab){
+    window.open(url, "_blank", "noopener,noreferrer");
+  }else{
+    window.location.href = url;
+  }
+});
 
 function renderAll(){
   renderBoard(activePage, board, { onEdit, onDelete, onReorder, onSettingsChange });
@@ -72,6 +111,7 @@ function switchPage(pageId){
   saveConfig(config);
   applyTheme();
   renderAll();
+  focusSearchBar();
 }
 
 btnAddPage.addEventListener("click", e => {
@@ -87,6 +127,7 @@ btnAddPage.addEventListener("click", e => {
   saveConfig(config);
   applyTheme();
   renderAll();
+  focusSearchBar();
 });
 
 btnDeletePage.addEventListener("click", () => {
@@ -100,6 +141,7 @@ btnDeletePage.addEventListener("click", () => {
   saveConfig(config);
   applyTheme();
   renderAll();
+  focusSearchBar();
 });
 
 // ---------------- Widget CRUD ----------------
@@ -209,6 +251,11 @@ const tintOpacityOut = document.getElementById("tint-opacity-out");
 const tintBlurInput = document.getElementById("setting-tint-blur");
 const tintBlurOut = document.getElementById("tint-blur-out");
 const textColorSelect = document.getElementById("setting-text-color");
+const searchEnabledInput = document.getElementById("setting-search-enabled");
+const searchProviderSelect = document.getElementById("setting-search-provider");
+const searchTemplateField = document.getElementById("setting-search-template-field");
+const searchTemplateInput = document.getElementById("setting-search-template");
+const searchNewTabInput = document.getElementById("setting-search-newtab");
 
 function rgbToHex(rgbStr){
   const [r, g, b] = rgbStr.split(",").map(n => parseInt(n.trim(), 10));
@@ -232,6 +279,14 @@ function openSettingsModal(){
   tintBlurInput.value = activePage.theme.tintBlur;
   tintBlurOut.textContent = activePage.theme.tintBlur;
   textColorSelect.value = activePage.theme.textMode;
+
+  const search = { ...defaultSearchBar(), ...activePage.search };
+  searchEnabledInput.checked = search.enabled;
+  searchProviderSelect.value = search.provider;
+  searchTemplateInput.value = search.customTemplate;
+  searchNewTabInput.checked = search.openInNewTab;
+  searchTemplateField.classList.toggle("hidden", search.provider !== "custom");
+
   modalSettings.classList.remove("hidden");
 }
 
@@ -302,6 +357,27 @@ textColorSelect.addEventListener("change", () => {
   saveConfig(config);
 });
 
+searchEnabledInput.addEventListener("change", () => {
+  activePage.search = { ...defaultSearchBar(), ...activePage.search, enabled: searchEnabledInput.checked };
+  applyTheme();
+  saveConfig(config);
+});
+searchProviderSelect.addEventListener("change", () => {
+  activePage.search = { ...defaultSearchBar(), ...activePage.search, provider: searchProviderSelect.value };
+  searchTemplateField.classList.toggle("hidden", searchProviderSelect.value !== "custom");
+  applyTheme();
+  saveConfig(config);
+});
+searchTemplateInput.addEventListener("change", () => {
+  activePage.search = { ...defaultSearchBar(), ...activePage.search, customTemplate: searchTemplateInput.value.trim() };
+  applyTheme();
+  saveConfig(config);
+});
+searchNewTabInput.addEventListener("change", () => {
+  activePage.search = { ...defaultSearchBar(), ...activePage.search, openInNewTab: searchNewTabInput.checked };
+  saveConfig(config);
+});
+
 document.getElementById("setting-export").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -310,6 +386,43 @@ document.getElementById("setting-export").addEventListener("click", () => {
   a.download = "startpage-config.json";
   a.click();
   URL.revokeObjectURL(url);
+});
+
+document.getElementById("setting-export-page").addEventListener("click", () => {
+  const data = preparePageForExport(activePage);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const slug = (activePage.name || "page").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "page";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `startpage-${slug}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+const importPageFileInput = document.getElementById("import-page-file-input");
+document.getElementById("setting-import-page").addEventListener("click", () => importPageFileInput.click());
+importPageFileInput.addEventListener("change", () => {
+  const file = importPageFileInput.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      const page = pageFromImport(parsed);
+      if(!page) throw new Error("Not a page export");
+      config.pages.push(page);
+      config.activePageId = page.id;
+      activePage = page;
+      applyTheme();
+      persistAndRender();
+      showToast("Page imported");
+    }catch(e){
+      alert("Invalid page file.");
+    }
+  };
+  reader.readAsText(file);
+  importPageFileInput.value = "";
 });
 
 const importFileInput = document.getElementById("import-file-input");
@@ -363,6 +476,7 @@ function escapeAttr(str){
 
 applyTheme();
 renderAll();
+focusSearchBar();
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => {

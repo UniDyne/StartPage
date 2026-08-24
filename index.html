@@ -32,6 +32,13 @@
   </button>
 </div>
 
+<div id="search-bar" class="search-bar hidden">
+  <form id="search-bar-form" autocomplete="off">
+    <img id="search-bar-favicon" class="search-bar-favicon hidden" alt="">
+    <input id="search-bar-input" type="text" placeholder="Search…" autocomplete="off">
+  </form>
+</div>
+
 <main id="board" class="board">
   <div class="column" data-col="0"></div>
   <div class="column" data-col="1"></div>
@@ -122,6 +129,34 @@
       </label>
 
       <hr>
+
+      <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="setting-search-enabled" style="width:auto;">
+        <span>Show a search bar at the top of this page</span>
+      </label>
+      <label class="field">
+        <span>Search provider</span>
+        <select id="setting-search-provider">
+          <option value="duckduckgo">DuckDuckGo</option>
+          <option value="google">Google</option>
+          <option value="bing">Bing</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </label>
+      <label class="field" id="setting-search-template-field">
+        <span>Custom search URL template (use <code>{q}</code> for the query)</span>
+        <input type="text" id="setting-search-template" placeholder="https://example.com/search?q={q}">
+      </label>
+      <label class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="setting-search-newtab" style="width:auto;">
+        <span>Open search results in a new tab</span>
+      </label>
+
+      <hr>
+      <button id="setting-export-page" class="chrome-btn small">Export page</button>
+      <button id="setting-import-page" class="chrome-btn small">Import page</button>
+
+      <hr>
       <button id="setting-export" class="chrome-btn small">Export config</button>
       <button id="setting-import" class="chrome-btn small">Import config</button>
       <button id="setting-reset" class="chrome-btn small danger">Reset all</button>
@@ -133,6 +168,7 @@
 </div>
 
 <input type="file" id="import-file-input" accept="application/json" class="hidden">
+<input type="file" id="import-page-file-input" accept="application/json" class="hidden">
 
 <div id="toast" class="toast hidden"></div>
 
