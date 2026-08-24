@@ -188,13 +188,16 @@ function onDelete(id){
 }
 
 function onReorder(updates){
+  // The dragged DOM nodes are already in their final position (render.js moves
+  // them live during dragover) — just persist the new col/order, don't tear
+  // down and remount every widget on the page (expensive, and re-triggers any
+  // widget's own network fetches on mount, e.g. ipinfo).
   const byId = new Map(activePage.widgets.map(w => [w.id, w]));
   updates.forEach(u => {
     const w = byId.get(u.id);
     if(w){ w.col = u.col; w.order = u.order; }
   });
   saveConfig(config);
-  renderAll();
 }
 
 function onSettingsChange(id, newSettings){

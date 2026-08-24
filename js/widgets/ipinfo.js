@@ -3,16 +3,28 @@ export const meta = { type: "ipinfo", label: "IP & User Agent" };
 const IPV4_URL = "https://api.ipify.org?format=json";
 const IPV6_URL = "https://api64.ipify.org?format=json";
 
+// ipify starts returning 429s if queried too often — only refetch if the
+// cached result is older than this, regardless of how often the widget remounts.
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 export function defaultSettings(){
-  return {};
+  return { ipv4: null, ipv6: null, fetchedAt: 0 };
 }
 
-export function renderSettingsForm(container){
-  container.innerHTML = `<p style="font-size:12px; color:rgba(255,255,255,0.6);">No configurable options for this widget.</p>`;
+export function renderSettingsForm(container, settings){
+  const s = { ...defaultSettings(), ...settings };
+  container.innerHTML = `
+    <input type="hidden" data-field="cache" value='${escapeAttr(JSON.stringify({ ipv4: s.ipv4, ipv6: s.ipv6, fetchedAt: s.fetchedAt }))}'>
+    <p style="font-size:12px; color:rgba(255,255,255,0.6);">No configurable options for this widget.</p>
+  `;
 }
 
-export function collectSettings(){
-  return {};
+export function collectSettings(container){
+  try{
+    return JSON.parse(container.querySelector('[data-field="cache"]').value || "{}");
+  }catch(e){
+    return defaultSettings();
+  }
 }
 
 async function fetchIp(url){
@@ -20,7 +32,7 @@ async function fetchIp(url){
     const res = await fetch(url, { cache: "no-store" });
     if(!res.ok) throw new Error("bad response");
     const data = await res.json();
-    return data.ip || "—";
+    return data.ip || null;
   }catch(e){
     return null;
   }
@@ -33,17 +45,23 @@ function copyBtnHtml(){
   return `<button class="copy-btn" data-copy title="Copy" aria-label="Copy">${COPY_ICON}</button>`;
 }
 
-export function mount(el){
+export function mount(el, widget, ctx){
+  const s = { ...defaultSettings(), ...widget.settings };
   el.classList.add("w-ipinfo");
+
+  const isStale = !s.fetchedAt || (Date.now() - s.fetchedAt) > REFRESH_INTERVAL_MS;
+  const initialIpv4 = s.ipv4 || (isStale ? "loading…" : "unavailable");
+  const initialIpv6 = s.ipv6 || (isStale ? "loading…" : "unavailable");
+
   el.innerHTML = `
     <div class="row" data-row="ipv4">
       <span class="label">IPv4</span>
-      <span class="value">loading…</span>
+      <span class="value">${escapeHtml(initialIpv4)}</span>
       ${copyBtnHtml()}
     </div>
     <div class="row" data-row="ipv6">
       <span class="label">IPv6</span>
-      <span class="value">loading…</span>
+      <span class="value">${escapeHtml(initialIpv6)}</span>
       ${copyBtnHtml()}
     </div>
     <div class="row" data-row="ua">
@@ -82,12 +100,18 @@ export function mount(el){
 
   let cancelled = false;
 
-  (async () => {
-    const [v4, v6] = await Promise.all([fetchIp(IPV4_URL), fetchIp(IPV6_URL)]);
-    if(cancelled) return;
-    ipv4Row.querySelector(".value").textContent = v4 || "unavailable";
-    ipv6Row.querySelector(".value").textContent = v6 || "unavailable";
-  })();
+  if(isStale){
+    (async () => {
+      const [v4, v6] = await Promise.all([fetchIp(IPV4_URL), fetchIp(IPV6_URL)]);
+      if(cancelled) return;
+      // Keep the last known-good value if this attempt failed (e.g. rate limited),
+      // but always stamp fetchedAt so we don't immediately retry.
+      const next = { ipv4: v4 || s.ipv4 || null, ipv6: v6 || s.ipv6 || null, fetchedAt: Date.now() };
+      ipv4Row.querySelector(".value").textContent = next.ipv4 || "unavailable";
+      ipv6Row.querySelector(".value").textContent = next.ipv6 || "unavailable";
+      if(ctx && ctx.onSettingsChange) ctx.onSettingsChange(next);
+    })();
+  }
 
   return {
     destroy(){ cancelled = true; }
@@ -98,4 +122,10 @@ function escapeHtml(str){
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+function escapeAttr(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
