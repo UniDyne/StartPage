@@ -1,4 +1,4 @@
-import { loadConfig, saveConfig, uid, createPage, getActivePage, normalizeConfig, preparePageForExport, pageFromImport, defaultSearchBar } from "./storage.js";
+import { loadConfig, saveConfig, uid, createPage, getActivePage, normalizeConfig, preparePageForExport, pageFromImport, defaultSearchBar, prepareConfigForExport, resolveBackgroundValue, setPageBackgroundImage, clearPageBackgroundImage, clearAllImages, isLocalImageRef } from "./storage.js";
 import { registry, widgetTypes } from "./registry.js";
 import { renderBoard } from "./render.js";
 import { buildSearchUrl, faviconUrlFor } from "./searchbar.js";
@@ -17,7 +17,8 @@ function applyTheme(){
   root.style.setProperty("--tint-opacity", activePage.theme.tintOpacity);
   root.style.setProperty("--tint-blur", `${activePage.theme.tintBlur}px`);
   document.body.classList.toggle("theme-dark-text", activePage.theme.textMode === "dark");
-  bgLayer.style.backgroundImage = activePage.background.value ? `url("${activePage.background.value}")` : "none";
+  const bgValue = resolveBackgroundValue(activePage.background.value);
+  bgLayer.style.backgroundImage = bgValue ? `url("${bgValue}")` : "none";
 
   const name = (activePage.name || "").trim();
   pageTitleEl.textContent = name;
@@ -79,6 +80,23 @@ function onWidgetDragEnd(){
 function persistAndRender(){
   saveConfig(config);
   renderAll();
+}
+
+// Picks the column with the fewest widgets so new/copied widgets balance out
+// across columns instead of always piling into column 0.
+function leastPopulatedColumn(widgets){
+  const numCols = board.querySelectorAll(".column").length || 1;
+  const counts = new Array(numCols).fill(0);
+  widgets.forEach(w => { if(w.col >= 0 && w.col < numCols) counts[w.col]++; });
+  let best = 0;
+  for(let i = 1; i < numCols; i++){
+    if(counts[i] < counts[best]) best = i;
+  }
+  return best;
+}
+
+function nextOrderInColumn(widgets, col){
+  return Math.max(-1, ...widgets.filter(w => w.col === col).map(w => w.order)) + 1;
 }
 
 function showToast(msg){
@@ -170,13 +188,13 @@ function copyWidgetToPage(widgetId, targetPageId){
   const targetPage = config.pages.find(p => p.id === targetPageId);
   if(!widget || !targetPage) return;
 
-  const maxOrderInCol0 = Math.max(-1, ...targetPage.widgets.filter(w => w.col === 0).map(w => w.order));
+  const col = leastPopulatedColumn(targetPage.widgets);
   targetPage.widgets.push({
     id: uid(),
     type: widget.type,
     name: widget.name,
-    col: 0,
-    order: maxOrderInCol0 + 1,
+    col,
+    order: nextOrderInColumn(targetPage.widgets, col),
     settings: JSON.parse(JSON.stringify(widget.settings))
   });
   saveConfig(config);
@@ -214,9 +232,32 @@ btnDeletePage.addEventListener("click", () => {
   if(config.pages.length <= 1) return;
   if(!confirm(`Delete "${activePage.name}"? This cannot be undone.`)) return;
   const idx = config.pages.findIndex(p => p.id === activePage.id);
+  clearPageBackgroundImage(config.pages[idx]);
   config.pages.splice(idx, 1);
-  const nextIdx = Math.max(0, idx - 1);
-  config.activePageId = config.pages[nextIdx].id;
+
+  // Land on the nearest page that's actually visible in the switcher right
+  // now (matches renderPageSwitcher's own filter) — preferring the one just
+  // before the deleted page, then falling back to searching forward.
+  const isVisible = p => !p.hidden || showHiddenPages;
+  let landing = null;
+  for(let i = idx - 1; i >= 0 && !landing; i--){
+    if(isVisible(config.pages[i])) landing = config.pages[i];
+  }
+  for(let i = idx; i < config.pages.length && !landing; i++){
+    if(isVisible(config.pages[i])) landing = config.pages[i];
+  }
+
+  if(landing){
+    config.activePageId = landing.id;
+  }else{
+    // Every remaining page is hidden — there's nothing visible to land on.
+    // Add a fresh visible page rather than touching the existing (hidden)
+    // ones, so their widgets aren't lost.
+    const page = createPage({ name: `Page ${config.pages.length + 1}` });
+    config.pages.push(page);
+    config.activePageId = page.id;
+  }
+
   activePage = getActivePage(config);
   saveConfig(config);
   applyTheme();
@@ -308,8 +349,8 @@ saveBtn.addEventListener("click", () => {
     widget.settings = settings;
     widget.name = name;
   }else{
-    const maxOrderInCol0 = Math.max(-1, ...activePage.widgets.filter(w => w.col === 0).map(w => w.order));
-    activePage.widgets.push({ id: uid(), type, name, col: 0, order: maxOrderInCol0 + 1, settings });
+    const col = leastPopulatedColumn(activePage.widgets);
+    activePage.widgets.push({ id: uid(), type, name, col, order: nextOrderInColumn(activePage.widgets, col), settings });
   }
   persistAndRender();
   closeWidgetModal();
@@ -355,7 +396,8 @@ function hexToRgb(hex){
 function openSettingsModal(){
   pageNameInput.value = activePage.name || "";
   pageHiddenInput.checked = !!activePage.hidden;
-  bgUrlInput.value = activePage.background.value && !activePage.background.value.startsWith("data:") ? activePage.background.value : "";
+  const bgVal = activePage.background.value || "";
+  bgUrlInput.value = (bgVal && !bgVal.startsWith("data:") && !isLocalImageRef(bgVal)) ? bgVal : "";
   tintColorInput.value = rgbToHex(activePage.theme.tintColor);
   tintOpacityInput.value = activePage.theme.tintOpacity;
   tintOpacityOut.textContent = activePage.theme.tintOpacity;
@@ -390,6 +432,7 @@ pageHiddenInput.addEventListener("change", () => {
 });
 
 bgUrlInput.addEventListener("change", () => {
+  clearPageBackgroundImage(activePage);
   activePage.background.value = bgUrlInput.value.trim();
   applyTheme();
   saveConfig(config);
@@ -400,7 +443,7 @@ bgFileInput.addEventListener("change", () => {
   if(!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    activePage.background.value = reader.result;
+    setPageBackgroundImage(activePage, reader.result);
     applyTheme();
     saveConfig(config);
     showToast("Background updated");
@@ -409,6 +452,7 @@ bgFileInput.addEventListener("change", () => {
 });
 
 bgClearBtn.addEventListener("click", () => {
+  clearPageBackgroundImage(activePage);
   activePage.background.value = "";
   bgUrlInput.value = "";
   bgFileInput.value = "";
@@ -462,7 +506,7 @@ searchNewTabInput.addEventListener("change", () => {
 });
 
 document.getElementById("setting-export").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(prepareConfigForExport(config), null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -532,6 +576,7 @@ importFileInput.addEventListener("change", () => {
 
 document.getElementById("setting-reset").addEventListener("click", () => {
   if(!confirm("Reset all pages and settings to defaults? This cannot be undone.")) return;
+  clearAllImages();
   localStorage.removeItem("startpage.config.v1");
   location.reload();
 });

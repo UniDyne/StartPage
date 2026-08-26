@@ -90,13 +90,18 @@ export function mount(el, widget, ctx){
     }
     listEl.innerHTML = s.items.map(item => `
       <li class="md-item-row" data-id="${item.id}">
-        <button type="button" class="md-item-open" title="Read">${EYE_ICON}<span class="md-item-title">${escapeHtml(deriveItemTitle(item))}</span></button>
+        <button type="button" class="icon-btn md-item-edit" title="Edit">${EYE_ICON}</button>
+        <button type="button" class="md-item-open" title="Read"><span class="md-item-title">${escapeHtml(deriveItemTitle(item))}</span></button>
         <button type="button" class="icon-btn md-item-remove" title="Remove">✕</button>
       </li>
     `).join("");
 
     listEl.querySelectorAll(".md-item-row").forEach(row => {
       const id = row.dataset.id;
+      row.querySelector(".md-item-edit").addEventListener("click", () => {
+        const item = s.items.find(i => i.id === id);
+        if(item) openEntryOverlay(item);
+      });
       row.querySelector(".md-item-open").addEventListener("click", () => {
         const item = s.items.find(i => i.id === id);
         if(item) openReadOverlay(item);
@@ -140,33 +145,36 @@ export function mount(el, widget, ctx){
     });
   }
 
-  function openAddOverlay(){
+  // Shared by both "Add article" (item omitted) and "Edit article" (existing
+  // item passed in, prefilled) — the eye icon on a list row opens this in edit mode.
+  function openEntryOverlay(item){
+    const isEdit = !!item;
     showOverlay(`
       <div class="modal-header">
-        <h2>Add article</h2>
+        <h2>${isEdit ? "Edit article" : "Add article"}</h2>
         <button class="icon-btn" data-close>✕</button>
       </div>
       <div class="modal-body">
         <label class="field">
           <span>Title</span>
-          <input type="text" data-add-title placeholder="Article title">
+          <input type="text" data-add-title placeholder="Article title" value="${escapeAttr(isEdit ? item.title : "")}">
         </label>
         <label class="field">
           <span>Fetch content from a URL (optional)</span>
           <div class="repeat-row">
-            <input type="url" data-add-source-url placeholder="https://example.com/article">
+            <input type="url" data-add-source-url placeholder="https://example.com/article" value="${escapeAttr(isEdit ? item.sourceUrl : "")}">
             <button type="button" class="chrome-btn small" data-add-fetch>Fetch</button>
           </div>
           <p data-add-fetch-status style="font-size:11px;color:rgba(255,255,255,0.5);"></p>
         </label>
         <label class="field">
           <span>Markdown content</span>
-          <textarea data-add-body rows="10" placeholder="# Heading&#10;&#10;Some **bold** text and a [link](https://example.com)"></textarea>
+          <textarea data-add-body rows="10" placeholder="# Heading&#10;&#10;Some **bold** text and a [link](https://example.com)">${isEdit ? escapeHtml(item.body || "") : ""}</textarea>
         </label>
       </div>
       <div class="modal-footer">
         <button type="button" class="chrome-btn" data-close>Cancel</button>
-        <button type="button" class="chrome-btn primary" data-add-save>Add article</button>
+        <button type="button" class="chrome-btn primary" data-add-save>${isEdit ? "Save changes" : "Add article"}</button>
       </div>
     `, (root) => {
       const titleInput = root.querySelector("[data-add-title]");
@@ -196,7 +204,7 @@ export function mount(el, widget, ctx){
           const data = await res.json().catch(() => null);
           if(!res.ok || !data || data.error) throw new Error((data && data.error) || `HTTP ${res.status}`);
           bodyInput.value = data.markdown || "";
-          statusEl.textContent = "Content fetched — review below, then Add article.";
+          statusEl.textContent = "Content fetched — review below, then save.";
         }catch(e){
           statusEl.textContent = `Couldn't fetch that page (${e.message}).`;
         }finally{
@@ -213,7 +221,13 @@ export function mount(el, widget, ctx){
           statusEl.textContent = "Add a title or some content first.";
           return;
         }
-        s.items.push({ id: uid(), title, body, sourceUrl });
+        if(isEdit){
+          item.title = title;
+          item.body = body;
+          item.sourceUrl = sourceUrl;
+        }else{
+          s.items.push({ id: uid(), title, body, sourceUrl });
+        }
         renderList();
         persist();
         closeOverlay();
@@ -227,7 +241,7 @@ export function mount(el, widget, ctx){
     addBtn.title = "Add article";
     addBtn.setAttribute("aria-label", "Add article");
     addBtn.innerHTML = PLUS_ICON;
-    addBtn.addEventListener("click", openAddOverlay);
+    addBtn.addEventListener("click", () => openEntryOverlay());
     ctx.headActions.insertBefore(addBtn, ctx.headActions.firstChild);
   }
 

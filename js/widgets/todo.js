@@ -5,6 +5,8 @@ export const meta = { type: "todo", label: "To-do List" };
 
 const dragCoordinator = createDragCoordinator("todo-item");
 
+const PLUS_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+
 export function defaultSettings(){
   return { title: "", items: [] };
 }
@@ -34,14 +36,9 @@ export function mount(el, widget, ctx){
   const titleHtml = s.title ? `<div class="todo-title">${escapeHtml(s.title)}</div>` : "";
   el.innerHTML = `
     ${titleHtml}
-    <form class="todo-add-row">
+    <form class="todo-add-row hidden">
       <input type="text" class="todo-add-input" placeholder="Add an item…" autocomplete="off">
-      <button type="submit" class="todo-add-btn" title="Add item" aria-label="Add item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
+      <button type="submit" class="todo-add-btn" title="Add item" aria-label="Add item">${PLUS_ICON}</button>
     </form>
     <ul class="todo-list"></ul>
   `;
@@ -149,6 +146,19 @@ export function mount(el, widget, ctx){
     renderItems();
     persist();
   });
+
+  if(ctx && ctx.headActions){
+    const addBtn = document.createElement("button");
+    addBtn.className = "icon-btn";
+    addBtn.title = "Add item";
+    addBtn.setAttribute("aria-label", "Add item");
+    addBtn.innerHTML = PLUS_ICON;
+    addBtn.addEventListener("click", () => {
+      form.classList.toggle("hidden");
+      if(!form.classList.contains("hidden")) input.focus();
+    });
+    ctx.headActions.insertBefore(addBtn, ctx.headActions.firstChild);
+  }
 
   renderItems();
 

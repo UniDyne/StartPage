@@ -33,8 +33,6 @@ html,body{
   color: var(--text-color);
 }
 
-input[type=color] { padding:0; }
-
 #bg-layer{
   position:fixed;
   inset:0;
@@ -428,11 +426,12 @@ input[type=color] { padding:0; }
   outline-offset: 0.25rem;
   border-radius: 0.5rem;
 }
+.md-item-edit{ flex-shrink:0; }
+.md-item-edit svg{ width:0.875rem; height:0.875rem; display:block; color: var(--text-color-dim); }
 .md-item-open{
   flex:1;
   display:flex;
   align-items:center;
-  gap:0.5rem;
   min-width:0;
   background:none;
   border:none;
@@ -442,7 +441,6 @@ input[type=color] { padding:0; }
   padding:0;
   cursor:pointer;
 }
-.md-item-open svg{ width:0.875rem; height:0.875rem; flex-shrink:0; color: var(--text-color-dim); }
 .md-item-open:hover{ opacity:0.75; }
 .md-item-title{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .md-item-remove{ flex-shrink:0; }
